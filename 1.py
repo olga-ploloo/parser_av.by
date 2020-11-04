@@ -1,5 +1,13 @@
 from bs4 import BeautifulSoup
-import requests, json, re
+import requests, json, re, csv
+
+def dollar_str(data):
+    for i in data:
+        return ''.join(str(i.text[1:-2]).split())
+
+def ball_rubl_str(data):
+    for i in data:
+        return ''.join(str(i.text[:-2]).split())
 
 url = "https://cars.av.by/"
 headers = {
@@ -11,11 +19,8 @@ headers = {
 req = requests.get(url, headers)
 scr = req.text
 
-#with open('av.by.html', 'w') as file:
-#  file.write(scr)
-with open('av.by.html') as file:
-   src = file.read()
-soup = BeautifulSoup(src, 'lxml')
+
+soup = BeautifulSoup(scr, 'lxml')
 all_cars_brends = soup.find_all(class_='catalog__title')
 all_cars_brends_hrefs = soup.find_all(class_='catalog__link')
 all_cars_brends_dict = dict(zip([i.text.replace(' ', '_') for i in all_cars_brends], ['https://cars.av.by' + j.get('href') for j in all_cars_brends_hrefs]))
@@ -26,56 +31,117 @@ with open('all_brends_dict.json', 'w') as file:
 with open('all_brends_dict.json') as file:
     all_brends = json.load(file)
 count = 0
-co = 0
+
+with open ('all_cars2.csv', 'w') as file:
+    writer = csv.writer(file)
+    writer.writerow(
+        (
+            'link',
+            'brend',
+            'model',
+            'generation',
+            'cost_bell',
+            'cost_doll',
+            'year',
+            'gearbox',
+            'engine_volume',
+            'fuel',
+            'mileage',
+            'city',
+            'body_type',
+            'drive_train',
+            'color',
+
+        )
+    )
+
 for brend_name, brend_href in all_brends.items():
-    if count == 0:
-        req_ = requests.get(url=brend_href, headers=headers)
-        src_ = req_.text
 
-        # with open(f'data/{count}_{brend_name}.html', 'w') as file:
-        #     file.write(src_)
-        # with open(f'data/{count}_{brend_name}.html') as file:
-        #     src_ = file.read()
-        soup = BeautifulSoup(src_, 'lxml')
-        brend_models_title = soup.find_all(class_='catalog__title')
-        brend_models_hrefs = soup.find_all(class_='catalog__link')
-        brend_model_dict = dict(zip([i.text.replace(' ', '_') for i in brend_models_title],
-                                        ['https://cars.av.by' + j.get('href') for j in brend_models_hrefs]))
-        #print(brend_model_dict)
-        for model_title, model_href in brend_model_dict.items():
-            if co == 0 or co == 1:
-                req__ = requests.get(url=model_href, headers=headers)
-                src__ = req__.text
-                soup_model = BeautifulSoup(src__, 'lxml')
-                model_car = soup_model.find_all(True, {'class': ['listing-top__title-link', 'listing-item__link']})
-                model_car_href = ['https://cars.av.by' + item.get('href') for item in model_car]
+    req_ = requests.get(url=brend_href, headers=headers)
+    src_ = req_.text
 
-                model_car_to_string = [(str(i)) for i in model_car ]
-                print(len(model_car_to_string), model_car_to_string)
-                for _string in model_car_to_string:
-                    list_find_title = re.findall(r'(\>[\w,\s]+<)', _string)
-                    print(list_find_title)
-                    list_deployed = []
-                    for item in list_find_title:
-                        if item != '>\xa0<' and item != '> <':
+    # with open(f'data/{count}_{brend_name}.html', 'w') as file:
+    #     file.write(src_)
+    # with open(f'data/{count}_{brend_name}.html') as file:
+    #     src_ = file.read()
+    soup = BeautifulSoup(src_, 'lxml')
+    brend_models_title = soup.find_all(class_='catalog__title')
+    brend_models_hrefs = soup.find_all(class_='catalog__link')
+    brend_model_dict = dict(zip([i.text.replace(' ', '_') for i in brend_models_title],
+                                    ['https://cars.av.by' + j.get('href') for j in brend_models_hrefs]))
+    #print(brend_model_dict)
+    for model_title, model_href in brend_model_dict.items():
 
-                            list_deployed.append(item[1:-1])
-                        for item in model_car_href:
-                            req__ = requests.get(url=item, headers=headers)
-                            src__ = req__.text
-                            soup_model = BeautifulSoup(src__, 'lxml')
-                            equipment = soup_model.find_all(class_='card__price-primary')
-                            card_title = soup_model.find_all(class_='card__title')
-                            for i in equipment:
-                                a = str(i.text[:-2])
-                                b = ''.join(a.split())
-                                print(b)
+        req__ = requests.get(url=model_href, headers=headers)
+        src__ = req__.text
+        soup_model = BeautifulSoup(src__, 'lxml')
+        model_car = soup_model.find_all(True, {'class': ['listing-top__title-link', 'listing-item__link']})
 
-                        print(f'{list_deployed} =')
+        for item in model_car:
+            list_deployed = []
+            list_deployed.append('https://cars.av.by' + item.get('href'))
+            _string = str(item)
+            list_find_title = re.findall(r'(\>[^<]+<)', _string)
+
+            for item in list_find_title:
+                if item != '>\xa0<' and item != '> <':
+                    list_deployed.append(item[1:-1].replace('· ', ''))
+
+            if len(list_deployed) == 3 :
+                list_deployed.append('')
+            hrefs = list_deployed[0]
+            req__ = requests.get(url=hrefs, headers=headers)
+            src__ = req__.text
+            soup_model = BeautifulSoup(src__, 'lxml')
+            cost_bel = soup_model.find_all(class_='card__price-primary')
+            cost_dollar = soup_model.find_all(class_='card__price-secondary')
+            params = soup_model.find_all(class_='card__params')
+            description = soup_model.find_all(class_='card__description')
+            city =  soup_model.find_all(class_='card__location')
+
+            list_deployed.append(ball_rubl_str(cost_bel))
+            list_deployed.append(dollar_str(cost_dollar))
+            for i in params:
+                list_params = (i.text.split(', '))
+                try:
+                    list_deployed.append(list_params[0][:-3])
+                except IndexError:
+                    list_deployed.append('')
+                try:
+                    list_deployed.append(list_params[1])
+                except IndexError:
+                    list_deployed.append('')
+                try:
+                    list_deployed.append(list_params[2][:-2])
+                except IndexError:
+                    list_deployed.append('')
+                try:
+                    list_deployed.append(list_params[3])
+                except IndexError:
+                    list_deployed.append('')
+                try:
+                    list_deployed.append(list_params[4].replace('\u2009', '')[:-3])
+                except IndexError:
+                    list_deployed.append('')
+                
+
+            for i in city:
+                list_deployed.append(i.text)
+            for i in description:
+                list_description = (i.text.split(', '))
+                if len(list_description) == 3:
+                    list_description[1], list_description[2] = list_description[2], list_description[1]
+
+                for i in list_description:
+                    list_deployed.append(i)
+
+            with open('all_cars2.csv', 'a') as file:
+                writer = csv.writer(file)
+                writer.writerow(list_deployed)
+            print(f'{list_deployed} =')
 
 
 
 
 
-                co +=1
-        count += 1
+
